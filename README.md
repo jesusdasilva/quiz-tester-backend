@@ -74,8 +74,8 @@ Content-Type: application/json
 
 {
   "topic_id": "topic-id-aqui",
-  "answers_to_select": 1,
-  "correct_answer": 0,
+  "number": 1,
+  "correct_answers": [0],
   "locales": {
     "en": {
       "question": "How are commits related to pull requests?",
@@ -121,13 +121,81 @@ GET /api/questions/{id}
 GET /api/questions/topic/{topicId}
 ```
 
+#### Navegación secuencial de preguntas
+```http
+GET /api/questions/topic/{topicId}/navigate/{number}
+```
+
+Este endpoint permite navegar secuencialmente por las preguntas de un tema específico, proporcionando información de navegación para implementar botones "anterior" y "siguiente".
+
+**Parámetros:**
+- `topicId`: ID del tema
+- `number`: Número de la pregunta (entero positivo)
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "message": "Pregunta obtenida exitosamente",
+  "data": {
+    "question": {
+      "id": "abc123",
+      "question_id": "abc123",
+      "topic_id": "topic-id",
+      "number": 3,
+      "correct_answers": [0],
+      "locales": {
+        "en": {
+          "question": "Question text",
+          "options": ["Option A", "Option B"],
+          "explanation": "Explanation text"
+        },
+        "es": {
+          "question": "Texto de la pregunta",
+          "options": ["Opción A", "Opción B"],
+          "explanation": "Texto de explicación"
+        }
+      },
+      "createdAt": "2025-07-25T04:30:00.000Z",
+      "updatedAt": "2025-07-25T04:30:00.000Z"
+    },
+    "navigation": {
+      "current": 3,
+      "total": 10,
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousNumber": 2,
+      "nextNumber": 4
+    }
+  }
+}
+```
+
+**Información de navegación:**
+- `current`: Número de la pregunta actual
+- `total`: Total de preguntas en el tema
+- `hasPrevious`: Indica si existe pregunta anterior
+- `hasNext`: Indica si existe pregunta siguiente
+- `previousNumber`: Número de la pregunta anterior (null si no existe)
+- `nextNumber`: Número de la pregunta siguiente (null si no existe)
+
+**Ejemplo de uso:**
+```bash
+# Obtener la pregunta número 3 del tema
+GET /api/questions/topic/bW3pB7PgJcRW6Fpk1KRB/navigate/3
+
+# Obtener la primera pregunta del tema
+GET /api/questions/topic/bW3pB7PgJcRW6Fpk1KRB/navigate/1
+```
+
 #### Actualizar pregunta
 ```http
 PUT /api/questions/{id}
 Content-Type: application/json
 
 {
-  "correct_answer": 1,
+  "number": 2,
+  "correct_answers": [1],
   "locales": {
     "en": {
       "question": "Updated question text",
@@ -148,6 +216,131 @@ Content-Type: application/json
 DELETE /api/questions/{id}
 ```
 
+## Questions
+
+### Crear una pregunta
+
+**POST** `/api/questions`
+
+```json
+{
+  "topic_id": "topic_id",
+  "number": 1,
+  "correct_answers": [0, 2],
+  "locales": {
+    "en": {
+      "question": "What type of accounts are available in the platform?",
+      "options": [
+        {
+          "id": 1,
+          "text": "Personal accounts"
+        },
+        {
+          "id": 2,
+          "text": "Organization accounts"
+        },
+        {
+          "id": 3,
+          "text": "Enterprise accounts"
+        },
+        {
+          "id": 4,
+          "text": "Shared accounts"
+        },
+        {
+          "id": 5,
+          "text": "Company accounts"
+        }
+      ],
+      "explanation": "The platform supports multiple types of accounts to meet different organizational needs."
+    },
+    "es": {
+      "question": "¿Qué tipos de cuentas están disponibles en la plataforma?",
+      "options": [
+        {
+          "id": 1,
+          "text": "Cuentas personales"
+        },
+        {
+          "id": 2,
+          "text": "Cuentas de organización"
+        },
+        {
+          "id": 3,
+          "text": "Cuentas empresariales"
+        },
+        {
+          "id": 4,
+          "text": "Cuentas compartidas"
+        },
+        {
+          "id": 5,
+          "text": "Cuentas de empresa"
+        }
+      ],
+      "explanation": "La plataforma soporta múltiples tipos de cuentas para satisfacer diferentes necesidades organizacionales."
+    }
+  }
+}
+```
+
+### Actualizar una pregunta
+
+**PUT** `/api/questions/:id`
+
+```json
+{
+  "number": 2,
+  "correct_answers": [1],
+  "locales": {
+    "en": {
+      "question": "Updated question text?",
+      "options": [
+        {
+          "id": 1,
+          "text": "Updated option 1"
+        },
+        {
+          "id": 2,
+          "text": "Updated option 2"
+        },
+        {
+          "id": 3,
+          "text": "Updated option 3"
+        },
+        {
+          "id": 4,
+          "text": "Updated option 4"
+        }
+      ],
+      "explanation": "Updated explanation"
+    },
+    "es": {
+      "question": "¿Texto de pregunta actualizado?",
+      "options": [
+        {
+          "id": 1,
+          "text": "Opción actualizada 1"
+        },
+        {
+          "id": 2,
+          "text": "Opción actualizada 2"
+        },
+        {
+          "id": 3,
+          "text": "Opción actualizada 3"
+        },
+        {
+          "id": 4,
+          "text": "Opción actualizada 4"
+        }
+      ],
+      "explanation": "Explicación actualizada"
+    }
+  }
+}
+```
+
 ## Validaciones
 
 ### Topics
@@ -157,14 +350,17 @@ DELETE /api/questions/{id}
 
 ### Questions
 - `topic_id`: Debe existir en la colección topics
-- `answers_to_select`: Entre 1 y 4
-- `correct_answer`: Entre 0 y 3
+- `number`: Número entero positivo, único por tema
+- `correct_answers`: Array no vacío con valores entre 0 y (número de opciones - 1)
 - `locales`: Requiere idiomas 'en' y 'es'
 - Cada idioma requiere:
   - `question`: Mínimo 10 caracteres
-  - `options`: Array con al menos 2 opciones
+  - `options`: Array con al menos 2 opciones, cada una con:
+    - `id`: String único dentro del idioma
+    - `text`: String no vacío
   - `explanation`: Mínimo 10 caracteres
-- `correct_answer` no puede exceder el número de opciones
+- No se permiten preguntas duplicadas (mismo texto en el mismo tema)
+- `correct_answers` no puede exceder el número de opciones disponibles
 
 ## Respuestas de la API
 
@@ -201,4 +397,33 @@ En caso de error:
 
 - `npm run dev` - Ejecutar en modo desarrollo con hot reload
 - `npm run build` - Compilar TypeScript a JavaScript
-- `npm start` - Ejecutar en producción 
+- `npm start` - Ejecutar en producción
+- `npm test` - Ejecutar pruebas
+- `npm run test:watch` - Ejecutar pruebas en modo watch
+
+## Scripts de Migración
+
+### Migrar Formato de Opciones
+
+Para migrar todas las preguntas del formato anterior de opciones (strings simples) al nuevo formato con IDs:
+
+```bash
+npm run migrate:options
+```
+
+**Ver ejemplo de migración:**
+```bash
+npm run migrate:options:example
+```
+
+### Asignar Números de Preguntas
+
+Para asignar números secuenciales a preguntas existentes:
+
+```bash
+npm run fix:numbers
+```
+
+### Documentación Completa
+
+Ver `scripts/README.md` para información detallada sobre todos los scripts de migración disponibles.

@@ -35,6 +35,7 @@ export class QuestionService {
     topic_id: string;
     correct_answers: number[];
     locales: QuestionLocales;
+    number: number;
   }): Promise<Question> {
     Logger.info('Creando nueva pregunta', { topicId: questionData.topic_id });
     
@@ -44,26 +45,38 @@ export class QuestionService {
       throw new Error('El tema especificado no existe');
     }
 
+    // Validar que number sea un entero positivo
+    if (!Number.isInteger(questionData.number) || questionData.number <= 0) {
+      throw new Error('El campo number debe ser un número entero positivo');
+    }
+
+    // Validar unicidad de number por topic
+    const exists = await this.questionModel.existsByTopicIdAndNumber(questionData.topic_id, questionData.number);
+    if (exists) {
+      throw new Error('Ya existe una pregunta con ese número en el tema especificado');
+    }
+
     // Validar correct_answers
     if (!Array.isArray(questionData.correct_answers) || questionData.correct_answers.length === 0) {
       throw new Error('correct_answers debe ser un array no vacío');
     }
 
-    // Validar que todos los valores en correct_answers estén entre 0 y 3
-    for (const answer of questionData.correct_answers) {
-      if (answer < 0 || answer > 3) {
-        throw new Error('Todos los valores en correct_answers deben estar entre 0 y 3');
-      }
+    // Validar que exista al menos una respuesta correcta
+    if (questionData.correct_answers.length === 0) {
+      throw new Error('Debe existir al menos una respuesta correcta');
     }
 
-    // Validar que correct_answers no exceda el número de opciones
-    const maxOptions = Math.max(
-      questionData.locales.en.options.length,
-      questionData.locales.es.options.length
-    );
-    for (const answer of questionData.correct_answers) {
-      if (answer >= maxOptions) {
-        throw new Error('correct_answers no puede contener valores mayores o iguales al número de opciones');
+    // Validar que todos los valores en correct_answers estén entre 0 y el número de opciones
+    if (questionData.locales) {
+      const maxOptions = Math.max(
+        questionData.locales.en.options.length,
+        questionData.locales.es.options.length
+      );
+      
+      for (const answer of questionData.correct_answers) {
+        if (answer < 0 || answer >= maxOptions) {
+          throw new Error(`Todos los valores en correct_answers deben estar entre 0 y ${maxOptions - 1}`);
+        }
       }
     }
 
@@ -101,11 +114,30 @@ export class QuestionService {
   async updateQuestion(id: string, questionData: Partial<Question>): Promise<Question | null> {
     Logger.info('Actualizando pregunta', { questionId: id });
     
+    const question = await this.questionModel.findById(id);
+    if (!question) {
+      throw new Error('Pregunta no encontrada');
+    }
+
     // Validar topic_id si se proporciona
+    let topicIdToCheck = question.topic_id;
     if (questionData.topic_id) {
       const topic = await this.topicModel.findById(questionData.topic_id);
       if (!topic) {
         throw new Error('El tema especificado no existe');
+      }
+      topicIdToCheck = questionData.topic_id;
+    }
+
+    // Validar number si se proporciona
+    if (questionData.number !== undefined) {
+      if (!Number.isInteger(questionData.number) || questionData.number <= 0) {
+        throw new Error('El campo number debe ser un número entero positivo');
+      }
+      // Validar unicidad de number por topic (excluyendo la pregunta actual)
+      const exists = await this.questionModel.existsByTopicIdAndNumber(topicIdToCheck, questionData.number, id);
+      if (exists) {
+        throw new Error('Ya existe una pregunta con ese número en el tema especificado');
       }
     }
 
@@ -115,10 +147,16 @@ export class QuestionService {
         throw new Error('correct_answers debe ser un array no vacío');
       }
 
-      // Validar que todos los valores en correct_answers estén entre 0 y 3
-      for (const answer of questionData.correct_answers) {
-        if (answer < 0 || answer > 3) {
-          throw new Error('Todos los valores en correct_answers deben estar entre 0 y 3');
+      // Validar que todos los valores en correct_answers estén entre 0 y el número de opciones
+      if (questionData.locales) {
+        const maxOptions = Math.max(
+          questionData.locales.en.options.length,
+          questionData.locales.es.options.length
+        );
+        for (const answer of questionData.correct_answers) {
+          if (answer < 0 || answer >= maxOptions) {
+            throw new Error(`Todos los valores en correct_answers deben estar entre 0 y ${maxOptions - 1}`);
+          }
         }
       }
     }
@@ -131,11 +169,11 @@ export class QuestionService {
       }
 
       // Validar que correct_answers no exceda el número de opciones
-      const maxOptions = Math.max(
-        questionData.locales.en.options.length,
-        questionData.locales.es.options.length
-      );
       if (questionData.correct_answers !== undefined) {
+        const maxOptions = Math.max(
+          questionData.locales.en.options.length,
+          questionData.locales.es.options.length
+        );
         for (const answer of questionData.correct_answers) {
           if (answer >= maxOptions) {
             throw new Error('correct_answers no puede contener valores mayores o iguales al número de opciones');

@@ -8,38 +8,74 @@ export class QuestionController {
   private questionModel = new QuestionModel();
   private topicModel = new TopicModel();
 
-  private validateLocales(locales: QuestionLocales): string | null {
-    const requiredLanguages = ['en', 'es'];
+  private validateLocales(locales: any): string | null {
+    if (!locales || typeof locales !== 'object') {
+      return 'locales debe ser un objeto';
+    }
+
+    if (!locales.en || !locales.es) {
+      return 'locales debe contener en y es';
+    }
+
+    const languages = ['en', 'es'];
     
-    for (const lang of requiredLanguages) {
-      const locale = locales[lang as keyof QuestionLocales];
-      if (!locale) {
-        return `Falta el idioma ${lang}`;
-      }
+    for (const lang of languages) {
+      const locale = locales[lang];
       
-      if (!locale.question || locale.question.trim().length < 10) {
-        return `La pregunta en ${lang} debe tener al menos 10 caracteres`;
+      if (!locale || typeof locale !== 'object') {
+        return `locale ${lang} debe ser un objeto`;
       }
-      
-      if (!locale.options || !Array.isArray(locale.options) || locale.options.length < 2) {
-        return `Debe haber al menos 2 opciones en ${lang}`;
+
+      if (!locale.question || typeof locale.question !== 'string' || locale.question.trim() === '') {
+        return `locale ${lang} debe tener una pregunta válida`;
       }
-      
-      if (!locale.explanation || locale.explanation.trim().length < 10) {
-        return `La explicación en ${lang} debe tener al menos 10 caracteres`;
+
+      if (!locale.options || !Array.isArray(locale.options) || locale.options.length === 0) {
+        return `locale ${lang} debe tener opciones válidas`;
+      }
+
+      if (!locale.explanation || typeof locale.explanation !== 'string' || locale.explanation.trim() === '') {
+        return `locale ${lang} debe tener una explicación válida`;
+      }
+
+      // Validar estructura de opciones
+      const optionIds = new Set<number>();
+      for (const option of locale.options) {
+        if (!option || typeof option !== 'object') {
+          return `Cada opción en ${lang} debe ser un objeto con id y text`;
+        }
+        
+        if (!option.id || typeof option.id !== 'number' || option.id <= 0) {
+          return `Cada opción en ${lang} debe tener un id válido (número entero positivo)`;
+        }
+        
+        if (!option.text || typeof option.text !== 'string' || option.text.trim() === '') {
+          return `Cada opción en ${lang} debe tener un text válido`;
+        }
+        // Validar que el ID sea único
+        if (optionIds.has(option.id)) {
+          return `El id ${option.id} está duplicado en las opciones de ${lang}`;
+        }
+        optionIds.add(option.id);
       }
     }
-    
+
     return null;
   }
 
   async create(req: Request, res: Response): Promise<void> {
     try {
-      const { topic_id, correct_answers, locales } = req.body;
+      const { topic_id, correct_answers, locales, number } = req.body;
 
       // Validaciones básicas
-      if (!topic_id || !correct_answers || !locales) {
-        ResponseUtil.badRequest(res, 'Todos los campos son requeridos: topic_id, correct_answers, locales');
+      if (!topic_id || !correct_answers || !locales || number === undefined) {
+        ResponseUtil.badRequest(res, 'Todos los campos son requeridos: topic_id, correct_answers, locales, number');
+        return;
+      }
+
+      // Validar que number sea un entero positivo
+      if (!Number.isInteger(number) || number <= 0) {
+        ResponseUtil.badRequest(res, 'El campo number debe ser un número entero positivo');
         return;
       }
 
@@ -50,29 +86,79 @@ export class QuestionController {
         return;
       }
 
+      // Validar unicidad de number por topic
+      const exists = await this.questionModel.existsByTopicIdAndNumber(topic_id, number);
+      if (exists) {
+        ResponseUtil.badRequest(res, 'Ya existe una pregunta con ese número en el tema especificado');
+        return;
+      }
+
       // Validar correct_answers
       if (!Array.isArray(correct_answers) || correct_answers.length === 0) {
         ResponseUtil.badRequest(res, 'correct_answers debe ser un array no vacío');
         return;
       }
 
-      // Validar que todos los valores en correct_answers estén entre 0 y 3
-      for (const answer of correct_answers) {
-        if (answer < 0 || answer > 3) {
-          ResponseUtil.badRequest(res, 'Todos los valores en correct_answers deben estar entre 0 y 3');
-          return;
-        }
+      // Validar que exista al menos una respuesta correcta
+      if (correct_answers.length === 0) {
+        ResponseUtil.badRequest(res, 'Debe existir al menos una respuesta correcta');
+        return;
       }
 
-      // Validar locales
+      // Validar locales primero para obtener los IDs válidos de las opciones
       const localeError = this.validateLocales(locales);
       if (localeError) {
         ResponseUtil.badRequest(res, localeError);
         return;
       }
 
+      // Obtener todos los IDs válidos de las opciones (tanto en inglés como en español)
+      const enOptionIds = new Set(locales.en.options.map((opt: any) => opt.id));
+      const esOptionIds = new Set(locales.es.options.map((opt: any) => opt.id));
+      
+      // Verificar que ambos idiomas tengan los mismos IDs
+      if (enOptionIds.size !== esOptionIds.size) {
+        ResponseUtil.badRequest(res, 'Las opciones en inglés y español deben tener la misma cantidad de elementos');
+        return;
+      }
+      
+      for (const id of enOptionIds) {
+        if (!esOptionIds.has(id)) {
+          ResponseUtil.badRequest(res, `Los IDs de las opciones deben ser iguales en ambos idiomas. ID ${id} no coincide`);
+          return;
+        }
+      }
+
+      // Validar que cada valor en correct_answers corresponda a un ID válido de las opciones
+      for (const answer of correct_answers) {
+        if (!enOptionIds.has(answer)) {
+          const validIds = Array.from(enOptionIds).sort((a, b) => (a as number) - (b as number));
+          ResponseUtil.badRequest(res, `El valor ${answer} en correct_answers no corresponde a ningún ID de opción válido. IDs válidos: [${validIds.join(', ')}]`);
+          return;
+        }
+      }
+
+      // Validar que no exista una pregunta con el mismo texto en inglés
+      const existingEnglishQuestion = await this.questionModel.findByEnglishQuestion(topic_id, locales.en.question);
+      if (existingEnglishQuestion) {
+        ResponseUtil.badRequest(res, 'Ya existe una pregunta con el mismo texto en inglés en este tema', {
+          duplicateQuestion: existingEnglishQuestion
+        });
+        return;
+      }
+
+      // Validar que no exista una pregunta con el mismo texto en español
+      const existingSpanishQuestion = await this.questionModel.findBySpanishQuestion(topic_id, locales.es.question);
+      if (existingSpanishQuestion) {
+        ResponseUtil.badRequest(res, 'Ya existe una pregunta con el mismo texto en español en este tema', {
+          duplicateQuestion: existingSpanishQuestion
+        });
+        return;
+      }
+
       const question = await this.questionModel.create({
         topic_id,
+        number,
         correct_answers,
         locales
       });
@@ -174,7 +260,7 @@ export class QuestionController {
   async update(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { topic_id, correct_answers, locales } = req.body;
+      const { topic_id, correct_answers, locales, number } = req.body;
 
       const question = await this.questionModel.findById(id);
       if (!question) {
@@ -183,10 +269,26 @@ export class QuestionController {
       }
 
       // Validar topic_id si se proporciona
+      let topicIdToCheck = question.topic_id;
       if (topic_id) {
         const topic = await this.topicModel.findById(topic_id);
         if (!topic) {
           ResponseUtil.badRequest(res, 'El tema especificado no existe');
+          return;
+        }
+        topicIdToCheck = topic_id;
+      }
+
+      // Validar number si se proporciona
+      if (number !== undefined) {
+        if (!Number.isInteger(number) || number <= 0) {
+          ResponseUtil.badRequest(res, 'El campo number debe ser un número entero positivo');
+          return;
+        }
+        // Validar unicidad de number por topic (excluyendo la pregunta actual)
+        const exists = await this.questionModel.existsByTopicIdAndNumber(topicIdToCheck, number, id);
+        if (exists) {
+          ResponseUtil.badRequest(res, 'Ya existe una pregunta con ese número en el tema especificado');
           return;
         }
       }
@@ -198,11 +300,38 @@ export class QuestionController {
           return;
         }
 
-        // Validar que todos los valores en correct_answers estén entre 0 y 3
-        for (const answer of correct_answers) {
-          if (answer < 0 || answer > 3) {
-            ResponseUtil.badRequest(res, 'Todos los valores en correct_answers deben estar entre 0 y 3');
+        // Validar que exista al menos una respuesta correcta
+        if (correct_answers.length === 0) {
+          ResponseUtil.badRequest(res, 'Debe existir al menos una respuesta correcta');
+          return;
+        }
+
+        // Si se proporcionan locales, validar que correct_answers corresponda a IDs válidos
+        if (locales) {
+          // Obtener todos los IDs válidos de las opciones
+          const enOptionIds = new Set(locales.en.options.map((opt: any) => opt.id));
+          const esOptionIds = new Set(locales.es.options.map((opt: any) => opt.id));
+          
+          // Verificar que ambos idiomas tengan los mismos IDs
+          if (enOptionIds.size !== esOptionIds.size) {
+            ResponseUtil.badRequest(res, 'Las opciones en inglés y español deben tener la misma cantidad de elementos');
             return;
+          }
+          
+          for (const id of enOptionIds) {
+            if (!esOptionIds.has(id)) {
+              ResponseUtil.badRequest(res, `Los IDs de las opciones deben ser iguales en ambos idiomas. ID ${id} no coincide`);
+              return;
+            }
+          }
+
+          // Validar que cada valor en correct_answers corresponda a un ID válido de las opciones
+          for (const answer of correct_answers) {
+            if (!enOptionIds.has(answer)) {
+              const validIds = Array.from(enOptionIds).sort((a, b) => (a as number) - (b as number));
+              ResponseUtil.badRequest(res, `El valor ${answer} en correct_answers no corresponde a ningún ID de opción válido. IDs válidos: [${validIds.join(', ')}]`);
+              return;
+            }
           }
         }
       }
@@ -214,10 +343,29 @@ export class QuestionController {
           ResponseUtil.badRequest(res, localeError);
           return;
         }
+
+        // Validar que no exista una pregunta con el mismo texto en inglés (excluyendo la actual)
+        const existingEnglishQuestion = await this.questionModel.findByEnglishQuestion(topicIdToCheck, locales.en.question, id);
+        if (existingEnglishQuestion) {
+          ResponseUtil.badRequest(res, 'Ya existe una pregunta con el mismo texto en inglés en este tema', {
+            duplicateQuestion: existingEnglishQuestion
+          });
+          return;
+        }
+
+        // Validar que no exista una pregunta con el mismo texto en español (excluyendo la actual)
+        const existingSpanishQuestion = await this.questionModel.findBySpanishQuestion(topicIdToCheck, locales.es.question, id);
+        if (existingSpanishQuestion) {
+          ResponseUtil.badRequest(res, 'Ya existe una pregunta con el mismo texto en español en este tema', {
+            duplicateQuestion: existingSpanishQuestion
+          });
+          return;
+        }
       }
 
       const updatedQuestion = await this.questionModel.update(id, {
         topic_id,
+        number,
         correct_answers,
         locales
       });
@@ -245,6 +393,64 @@ export class QuestionController {
     } catch (error) {
       Logger.error('Error al eliminar pregunta', error);
       ResponseUtil.error(res, 'Error al eliminar pregunta', 500, error);
+    }
+  }
+
+  async getQuestionByNumber(req: Request, res: Response): Promise<void> {
+    try {
+      const { topicId, number } = req.params;
+      const questionNumber = parseInt(number);
+
+      // Validar que el número sea válido
+      if (isNaN(questionNumber) || questionNumber <= 0) {
+        ResponseUtil.badRequest(res, 'El número de pregunta debe ser un entero positivo');
+        return;
+      }
+
+      // Validar que el topic existe
+      const topic = await this.topicModel.findById(topicId);
+      if (!topic) {
+        ResponseUtil.notFound(res, 'Tema no encontrado');
+        return;
+      }
+
+      // Obtener pregunta actual
+      const question = await this.questionModel.findByTopicIdAndNumber(topicId, questionNumber);
+      if (!question) {
+        ResponseUtil.notFound(res, 'Pregunta no encontrada');
+        return;
+      }
+
+      // Obtener todas las preguntas del tema para calcular navegación
+      const allQuestions = await this.questionModel.findByTopicId(topicId);
+      const totalQuestions = allQuestions.length;
+
+      // Calcular información de navegación
+      const hasPrevious = questionNumber > 1;
+      const hasNext = questionNumber < totalQuestions;
+
+      const navigationData = {
+        question,
+        navigation: {
+          current: questionNumber,
+          total: totalQuestions,
+          hasPrevious,
+          hasNext,
+          previousNumber: hasPrevious ? questionNumber - 1 : null,
+          nextNumber: hasNext ? questionNumber + 1 : null
+        }
+      };
+
+      Logger.info('Pregunta obtenida para navegación', { 
+        topicId, 
+        questionNumber, 
+        totalQuestions 
+      });
+      
+      ResponseUtil.success(res, navigationData, 'Pregunta obtenida exitosamente');
+    } catch (error) {
+      Logger.error('Error al obtener pregunta para navegación', error);
+      ResponseUtil.error(res, 'Error al obtener pregunta', 500, error);
     }
   }
 } 

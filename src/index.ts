@@ -25,3 +25,5 @@ app.listen(PORT, () => {
   Logger.info(`Health check en http://localhost:${PORT}/health`);
   Logger.info(`CORS configurado para desarrollo`);
 });
+
+export { app };

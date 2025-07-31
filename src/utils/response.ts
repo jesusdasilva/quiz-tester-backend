@@ -60,8 +60,13 @@ export class ResponseUtil {
     this.error(res, message, 404);
   }
 
-  static badRequest(res: Response, message: string = 'Solicitud incorrecta'): void {
-    this.error(res, message, 400);
+  static badRequest(res: Response, message: string = 'Solicitud incorrecta', additionalData?: any): void {
+    const response: ApiResponse = {
+      success: false,
+      message,
+      error: additionalData
+    };
+    res.status(400).json(response);
   }
 
   static unauthorized(res: Response, message: string = 'No autorizado'): void {
