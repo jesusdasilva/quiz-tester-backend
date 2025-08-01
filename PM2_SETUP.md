@@ -42,6 +42,12 @@ npm run pm2:start
 npm run pm2:start:prod
 ```
 
+**Nota:** La aplicación compila TypeScript a JavaScript antes de ejecutarse con PM2. Si tienes problemas, asegúrate de que:
+- El archivo `ecosystem.config.js` existe
+- Las variables de entorno están configuradas correctamente
+- Las credenciales de Firebase están disponibles
+- El directorio `dist/` se genera correctamente con `npm run build`
+
 ### Gestión de la aplicación
 ```bash
 npm run pm2:status      # Ver estado de la aplicación

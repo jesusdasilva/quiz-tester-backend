@@ -1,9 +1,8 @@
 module.exports = {
   apps: [{
     name: 'quiz-tester-backend',
-    script: 'src/index.ts',
+    script: 'dist/index.js',  // Usar el archivo compilado
     interpreter: 'node',
-    interpreter_args: '-r ts-node/register',
     
     // Configuración optimizada para 1GB RAM y 2 vCPU
     instances: 1,                    // Solo 1 instancia para evitar sobrecarga
