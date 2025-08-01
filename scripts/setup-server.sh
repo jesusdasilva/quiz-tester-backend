@@ -76,6 +76,15 @@ EOF
     echo "✅ Archivo tsconfig.json creado"
 fi
 
+# Verificar que TypeScript compile correctamente
+echo "🔧 Verificando compilación de TypeScript..."
+if npm run build; then
+    echo "✅ Compilación de TypeScript exitosa"
+else
+    echo "❌ Error en la compilación de TypeScript"
+    exit 1
+fi
+
 echo ""
 echo "🎉 Configuración completada!"
 echo ""
