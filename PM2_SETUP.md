@@ -42,11 +42,11 @@ npm run pm2:start
 npm run pm2:start:prod
 ```
 
-**Nota:** La aplicación compila TypeScript a JavaScript antes de ejecutarse con PM2. Si tienes problemas, asegúrate de que:
+**Nota:** La aplicación usa ts-node directamente sin compilación para evitar problemas en el servidor. Si tienes problemas, asegúrate de que:
 - El archivo `ecosystem.config.js` existe
 - Las variables de entorno están configuradas correctamente
 - Las credenciales de Firebase están disponibles
-- El directorio `dist/` se genera correctamente con `npm run build`
+- ts-node está instalado: `npm install --save-dev ts-node`
 
 ### Gestión de la aplicación
 ```bash

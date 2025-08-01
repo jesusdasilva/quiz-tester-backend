@@ -15,8 +15,8 @@
     "fix:correct-answers": "ts-node scripts/fix-correct-answers.ts",
     "fix:correct-answers-topic": "ts-node scripts/fix-correct-answers-topic.ts",
     "fix:correct-answers-from-number": "ts-node scripts/fix-correct-answers-from-number.ts",
-    "pm2:start": "npm run build && pm2 start ecosystem.config.js",
-    "pm2:start:prod": "npm run build && pm2 start ecosystem.config.js --env production",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:start:prod": "pm2 start ecosystem.config.js --env production",
     "pm2:stop": "pm2 stop quiz-tester-backend",
     "pm2:restart": "pm2 restart quiz-tester-backend",
     "pm2:delete": "pm2 delete quiz-tester-backend",
@@ -24,7 +24,8 @@
     "pm2:monit": "pm2 monit",
     "pm2:status": "pm2 status",
     "pm2:reload": "pm2 reload quiz-tester-backend",
-    "pm2:setup": "chmod +x scripts/setup-pm2.sh && ./scripts/setup-pm2.sh"
+    "pm2:setup": "chmod +x scripts/setup-pm2.sh && ./scripts/setup-pm2.sh",
+    "pm2:setup:server": "chmod +x scripts/setup-server.sh && ./scripts/setup-server.sh"
   },
   "keywords": [],
   "author": "",
