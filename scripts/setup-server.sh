@@ -48,8 +48,32 @@ fi
 if [ -f tsconfig.json ]; then
     echo "✅ Archivo tsconfig.json encontrado"
 else
-    echo "❌ Archivo tsconfig.json no encontrado"
-    exit 1
+    echo "⚠️  Archivo tsconfig.json no encontrado, creando uno básico..."
+    cat > tsconfig.json << 'EOF'
+{
+  "compilerOptions": {
+    "target": "es2016",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
+EOF
+    echo "✅ Archivo tsconfig.json creado"
 fi
 
 echo ""
