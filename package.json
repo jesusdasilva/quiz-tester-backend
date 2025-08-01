@@ -14,7 +14,17 @@
     "fix:numbers": "ts-node scripts/fix_question_numbers.ts",
     "fix:correct-answers": "ts-node scripts/fix-correct-answers.ts",
     "fix:correct-answers-topic": "ts-node scripts/fix-correct-answers-topic.ts",
-    "fix:correct-answers-from-number": "ts-node scripts/fix-correct-answers-from-number.ts"
+    "fix:correct-answers-from-number": "ts-node scripts/fix-correct-answers-from-number.ts",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:start:prod": "pm2 start ecosystem.config.js --env production",
+    "pm2:stop": "pm2 stop quiz-tester-backend",
+    "pm2:restart": "pm2 restart quiz-tester-backend",
+    "pm2:delete": "pm2 delete quiz-tester-backend",
+    "pm2:logs": "pm2 logs quiz-tester-backend",
+    "pm2:monit": "pm2 monit",
+    "pm2:status": "pm2 status",
+    "pm2:reload": "pm2 reload quiz-tester-backend",
+    "pm2:setup": "chmod +x scripts/setup-pm2.sh && ./scripts/setup-pm2.sh"
   },
   "keywords": [],
   "author": "",
