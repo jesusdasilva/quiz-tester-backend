@@ -18,6 +18,7 @@ app.use(routes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+//mensaje de prueba de cierre de issues
 // Iniciar servidor
 app.listen(PORT, () => {
   Logger.info(`Servidor corriendo en el puerto ${PORT}`);
